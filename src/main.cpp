@@ -43,7 +43,7 @@ SortedVector sortedVec;
 DataGenerator generator;
 
 const string DATA_FILE      = "data/products.csv";
-const string BENCHMARK_FILE = "results/benchmark.csv";
+const string BENCHMARK_FILE = "visualisasi/benchmark.csv";
 
 // ==================== Utility Functions ====================
 
