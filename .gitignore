@@ -1,0 +1,20 @@
+# Compiled binaries
+inventori.exe
+inventori
+*.o
+*.obj
+
+# Build artifacts
+*.out
+*.a
+*.lib
+
+# IDE files
+.vscode/
+.idea/
+*.user
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
