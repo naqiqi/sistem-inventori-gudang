@@ -1,11 +1,17 @@
 import Plotly from "plotly.js-dist-min";
 import Papa from "papaparse";
 
+// ── Warna & Tema Konsisten dengan skrip Python ──
 const colors = {
-  blue: "#2f5f98",       // BST (O(log N))
-  green: "#10b981",      // Hash Table (O(1))
-  orange: "#f59e0b",     // Sorted Vector (Mixed)
-  gray: "#64748b"
+  HashTable: '#2196F3',    // Biru (O(1) avg)
+  BST: '#FF9800',          // Oranye (O(log n) avg)
+  SortedVector: '#4CAF50'  // Hijau
+};
+
+const labels = {
+  HashTable: 'Hash Table (O(1) avg)',
+  BST: 'BST (O(log n) avg)',
+  SortedVector: 'Sorted Vector'
 };
 
 const plotConfig = {
@@ -13,23 +19,14 @@ const plotConfig = {
   displayModeBar: true
 };
 
-const baseLayout = {
+// Konfigurasi font dan dasar tampilan layout
+const baseLayoutStyles = {
+  font: { family: "DejaVu Sans, Arial, sans-serif" },
   paper_bgcolor: "rgba(0,0,0,0)",
-  plot_bgcolor: "rgba(0,0,0,0)",
-  font: {
-    family: "Inter, Arial, sans-serif",
-    color: "#172033"
-  },
-  margin: {
-    t: 70,
-    r: 30,
-    b: 70,
-    l: 70
-  },
-  hovermode: "closest"
+  plot_bgcolor: "rgba(0,0,0,0)"
 };
 
-// Membaca file benchmark dari folder results/ atau root public
+// Membaca file benchmark dari folder public/ atau root public server Vite
 fetch("/benchmark.csv")
   .then(response => response.text())
   .then(csvText => {
@@ -39,141 +36,145 @@ fetch("/benchmark.csv")
       dynamicTyping: true
     });
 
-    const data = parsed.data;
-    console.log("Data Benchmark C++ berhasil dibaca:", data);
-    
-    // Memanggil fungsi render grafik baru sesuai dataset Struktur Data
-    renderSummaryCards(data);
-    renderOperationComparisonBar(data, "INSERT", "chartInsertBar");
-    renderOperationComparisonBar(data, "SEARCH", "chartSearchBar");
-    renderScalabilityLineChart(data);
+    const rawData = parsed.data;
+    console.log("Data CSV berhasil dimuat:", rawData);
+
+    // Proses data ke bentuk map terstruktur: data[operasi][struktur][n] = waktu
+    const dataStructure = {};
+    const nsSet = new Set();
+
+    rawData.forEach(row => {
+      const n = intOrNull(row.n);
+      const op = row.operasi;
+      const ht = intOrNull(row.hashtable_us);
+      const bst = intOrNull(row.bst_us);
+      const sv = intOrNull(row.sorted_vector_us);
+
+      if (n !== null && op) {
+        nsSet.add(n);
+        if (!dataStructure[op]) {
+          dataStructure[op] = { HashTable: {}, BST: {}, SortedVector: {} };
+        }
+        dataStructure[op]['HashTable'][n] = ht;
+        dataStructure[op]['BST'][n] = bst;
+        dataStructure[op]['SortedVector'][n] = sv;
+      }
+    });
+
+    const nsList = Array.from(nsSet).sort((a, b) => a - b);
+    const operations = ['INSERT', 'SEARCH', 'UPDATE', 'DELETE'];
+
+    // ── Render Plot 1-4: Bar Chart Tunggal per Operasi ──
+    operations.forEach(op => {
+      if (dataStructure[op]) {
+        renderSingleOperationBar(dataStructure, nsList, op, `grafik_${op.toLowerCase()}`);
+      }
+    });
+
+    // ── Render Plot 5: Kurva Line Chart Skalabilitas Gabungan ──
+    renderScalabilityLineChart(dataStructure, nsList, operations, "grafik_semua_operasi");
   })
   .catch(error => {
-    console.error("Gagal membaca data CSV:", error);
+    console.error("Gagal memproses data CSV benchmark:", error);
   });
 
-// --- FUNGSI UTILITAS STATISTIK ---
-function average(values) {
-  const validValues = values.filter(v => v !== null && v !== undefined && v !== -1);
-  if (validValues.length === 0) return 0;
-  return validValues.reduce((sum, value) => sum + Number(value), 0) / validValues.length;
+function intOrNull(val) {
+  const num = parseInt(val);
+  return isNaN(num) ? null : num;
 }
 
 /**
- * 1. Menampilkan Ringkasan Performa Rata-rata Kecepatan (Metric Cards)
+ * RENDER PLOT 1-4: Grouped Bar Chart per Operasi
  */
-function renderSummaryCards(data) {
-  // Mengambil rata-rata dari seluruh baris data (kecuali nilai -1 yang menandakan skenario error/TTO)
-  const avgBST = average(data.map(item => item.bst_us));
-  const avgHashTable = average(data.map(item => item.hashtable_us));
-  const avgSortedVector = average(data.map(item => item.sorted_vector_us));
-
-  const setStatValue = (id, value) => {
-    const element = document.getElementById(id);
-    if (element) element.textContent = value;
-  };
-
-  setStatValue("avgHashTable", `${avgHashTable.toFixed(2)} μs`);
-  setStatValue("avgBST", `${avgBST.toFixed(2)} μs`);
-  setStatValue("avgSortedVector", `${avgSortedVector.toFixed(2)} μs`);
-}
-
-/**
- * 2. BAR CHART: Membandingkan Kecepatan Struktur Data pada Ukuran Data Terbesar (N Maksimal)
- * Sesuai permintaan Anda untuk memvisualisasikannya lewat Plotly Bar Chart.
- */
-function renderOperationComparisonBar(data, operationName, elementId) {
-  // Ambil ukuran N terbesar yang tersedia di dalam berkas untuk perbandingan ekstrem
-  const sizes = [...new Set(data.map(item => item.n))].filter(Number.isFinite);
-  const maxN = Math.max(...sizes);
-
-  // Filter baris data berdasarkan Nama Operasi dan N Terbesar
-  const targetData = data.find(item => item.operasi === operationName && item.n === maxN);
-
-  if (!targetData) return;
-
-  // Membuat trace Bar Chart tunggal / grouped untuk Plotly
-  const trace = {
-    x: ["Hash Table", "Binary Search Tree (BST)", "Sorted Vector"],
-    y: [targetData.hashtable_us, targetData.bst_us, targetData.sorted_vector_us],
-    type: "bar",
-    marker: {
-      color: [colors.green, colors.blue, colors.orange]
-    },
-    text: [
-      `${targetData.hashtable_us} μs`, 
-      `${targetData.bst_us} μs`, 
-      targetData.sorted_vector_us === -1 ? "N/A (Error/Time Out)" : `${targetData.sorted_vector_us} μs`
-    ],
-    textposition: "auto",
-    hovertemplate: `Struktur: %{x}<br>Waktu: %{y} μs<br>N: ${maxN.toLocaleString('id-ID')}<extra></extra>`
-  };
-
-  const layout = {
-    ...baseLayout,
-    title: `Perbandingan Waktu Operasi ${operationName} (N = ${maxN.toLocaleString('id-ID')})`,
-    xaxis: { title: "Struktur Data" },
-    yaxis: { 
-      title: "Waktu Eksekusi (μs)",
-      type: "linear" // Jika perbedaan angka us sangat jomplang, Anda bisa menggantinya dengan "log"
-    }
-  };
-
-  Plotly.newPlot(elementId, [trace], layout, plotConfig);
-}
-
-/**
- * 3. LINE CHART: Skalabilitas Pertumbuhan Kompleksitas Waktu (Growth Curve Chart)
- * Sangat krusial untuk membuktikan performa O(1) vs O(log N) vs O(N) seiring bertambahnya N
- */
-function renderScalabilityLineChart(data) {
-  // Ambil data khusus operasi SEARCH untuk melihat kurva pencarian murni
-  const searchPoints = data.filter(item => item.operasi === "SEARCH").sort((a, b) => a.n - b.n);
+function renderSingleOperationBar(data, nsList, op, elementId) {
+  const dsList = ['HashTable', 'BST', 'SortedVector'];
   
-  const xValues = searchPoints.map(item => item.n);
+  // Format label sumbu X dengan tanda koma ribuan (e.g. 10,000)
+  const xLabels = nsList.map(n => n.toLocaleString('en-US'));
 
-  const traceHashTable = {
-    x: xValues,
-    y: searchPoints.map(item => item.hashtable_us),
-    name: "Hash Table (Chaining)",
-    type: "scatter",
-    mode: "lines+markers",
-    line: { color: colors.green, width: 3, shape: "spline" },
-    marker: { size: 8 }
-  };
+  const traces = dsList.map(ds => {
+    const yValues = nsList.map(n => {
+      const val = data[op][ds][n];
+      // Jika nilai -1 atau kosong, jadikan 0 (skip bar) seperti logika Python
+      return (val !== undefined && val >= 0) ? val : 0;
+    });
 
-  const traceBST = {
-    x: xValues,
-    y: searchPoints.map(item => item.bst_us),
-    name: "BST",
-    type: "scatter",
-    mode: "lines+markers",
-    line: { color: colors.blue, width: 3, shape: "spline" },
-    marker: { size: 8 }
-  };
-
-  const traceVector = {
-    x: xValues,
-    y: searchPoints.map(item => item.sorted_vector_us === -1 ? null : item.sorted_vector_us), // Abaikan jika -1
-    name: "Sorted Vector",
-    type: "scatter",
-    mode: "lines+markers",
-    line: { color: colors.orange, width: 3, shape: "spline" },
-    marker: { size: 8 }
-  };
+    return {
+      x: xLabels,
+      y: yValues,
+      name: labels[ds],
+      type: 'bar',
+      marker: { color: colors[ds] },
+      text: yValues.map(v => v > 0 ? v.toLocaleString('en-US') : ''),
+      textposition: 'outside',
+      textfont: { size: 9 },
+      hovertemplate: `<b>${labels[ds]}</b><br>N: %{x}<br>Waktu: %{y} μs<extra></extra>`
+    };
+  });
 
   const layout = {
-    ...baseLayout,
-    title: "Kurva Skalabilitas Kompleksitas Waktu Operasi SEARCH",
-    xaxis: { 
-      title: "Ukuran Elemen Data (N)",
-      type: "linear"
+    ...baseLayoutStyles,
+    title: {
+      text: `<b>Perbandingan Performa: ${op}</b><br><span style="font-size:11px; color:#64748b;">Sistem Manajemen Inventori Gudang - Struktur Data IPB</span>`,
+      x: 0.05
     },
-    yaxis: { 
-      title: "Waktu Eksekusi (μs)",
-      type: "linear" // Gunakan 'log' jika nilai Sorted Vector meroket terlalu tinggi dibanding Hash Table
-    }
+    xaxis: { title: "Jumlah Data (N)", tickmode: "array", tickvals: xLabels },
+    yaxis: { title: "Waktu Eksekusi (μs)", gridcolor: "#e2e8f0" },
+    barmode: 'group',
+    bargap: 0.25,
+    bargroupgap: 0.1,
+    margin: { t: 80, b: 60, l: 60, r: 20 },
+    legend: { orientation: "h", y: -0.2 }
   };
 
-  Plotly.newPlot("scalabilityLineChart", [traceHashTable, traceBST, traceVector], layout, plotConfig);
+  Plotly.newPlot(elementId, traces, layout, plotConfig);
+}
+
+/**
+ * RENDER PLOT 5: Line Chart Skalabilitas Terintegrasi
+ */
+function renderScalabilityLineChart(data, nsList, operations, elementId) {
+  const dsList = ['HashTable', 'BST', 'SortedVector'];
+  const symbols = { HashTable: 'circle', BST: 'square', SortedVector: 'triangle-up' };
+  const traces = [];
+
+  // Looping operasi untuk membuat visualisasi multi-jalur dalam satu grafik komparatif
+  operations.forEach(op => {
+    if (!data[op]) return;
+
+    dsList.forEach(ds => {
+      const validPoints = nsList
+        .map(n => ({ n, v: data[op][ds][n] }))
+        .filter(pt => pt.v !== undefined && pt.v >= 0);
+
+      if (validPoints.length === 0) return;
+
+      traces.push({
+        x: validPoints.map(pt => pt.n),
+        y: validPoints.map(pt => pt.v),
+        // Kelompokkan legend berdasarkan struktur data agar rapi saat diklik
+        name: `${op} - ${ds}`,
+        legendgroup: ds,
+        type: 'scatter',
+        mode: 'lines+markers',
+        line: { color: colors[ds], width: 2 },
+        marker: { symbol: symbols[ds], size: 7 },
+        hovertemplate: `<b>${op} (${ds})</b><br>N: %{x}<br>Waktu: %{y} μs<extra></extra>`
+      });
+    });
+  });
+
+  const layout = {
+    ...baseLayoutStyles,
+    title: {
+      text: `<b>Perbandingan Skalabilitas: Hash Table vs BST vs Sorted Vector</b><br><span style="font-size:11px; color:#64748b;">Sistem Manajemen Inventori Gudang — Struktur Data IPB</span>`,
+      x: 0.05
+    },
+    xaxis: { title: "Ukuran Elemen Data (N)", gridcolor: "#e2e8f0" },
+    yaxis: { title: "Waktu (μs)", gridcolor: "#e2e8f0" },
+    margin: { t: 90, b: 60, l: 60, r: 20 },
+    legend: { font: { size: 10 } }
+  };
+
+  Plotly.newPlot(elementId, traces, layout, plotConfig);
 }
