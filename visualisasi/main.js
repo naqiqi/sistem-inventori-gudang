@@ -1,7 +1,6 @@
 import Plotly from "plotly.js-dist-min";
 import Papa from "papaparse";
 
-// ── Warna & Tema Konsisten dengan skrip Python ──
 const colors = {
   HashTable: '#2196F3',    // Biru (O(1) avg)
   BST: '#FF9800',          // Oranye (O(log n) avg)
@@ -95,7 +94,7 @@ function renderSingleOperationBar(data, nsList, op, elementId) {
   const traces = dsList.map(ds => {
     const yValues = nsList.map(n => {
       const val = data[op][ds][n];
-      // Jika nilai -1 atau kosong, jadikan 0 (skip bar) seperti logika Python
+      // Jika nilai -1 atau kosong, jadikan 0 (skip bar)
       return (val !== undefined && val >= 0) ? val : 0;
     });
 
@@ -115,7 +114,7 @@ function renderSingleOperationBar(data, nsList, op, elementId) {
   const layout = {
     ...baseLayoutStyles,
     title: {
-      text: `<b>Perbandingan Performa: ${op}</b><br><span style="font-size:11px; color:#64748b;">Sistem Manajemen Inventori Gudang - Struktur Data IPB</span>`,
+      text: `<b>Perbandingan Performa: ${op}</b><br><span style="font-size:11px; color:#64748b;">Sistem Manajemen Inventori Gudang</span>`,
       x: 0.05
     },
     xaxis: { title: "Jumlah Data (N)", tickmode: "array", tickvals: xLabels },
@@ -138,7 +137,6 @@ function renderScalabilityLineChart(data, nsList, operations, elementId) {
   const symbols = { HashTable: 'circle', BST: 'square', SortedVector: 'triangle-up' };
   const traces = [];
 
-  // Looping operasi untuk membuat visualisasi multi-jalur dalam satu grafik komparatif
   operations.forEach(op => {
     if (!data[op]) return;
 
@@ -167,7 +165,7 @@ function renderScalabilityLineChart(data, nsList, operations, elementId) {
   const layout = {
     ...baseLayoutStyles,
     title: {
-      text: `<b>Perbandingan Skalabilitas: Hash Table vs BST vs Sorted Vector</b><br><span style="font-size:11px; color:#64748b;">Sistem Manajemen Inventori Gudang — Struktur Data IPB</span>`,
+      text: `<b>Perbandingan Skalabilitas: Hash Table vs BST vs Sorted Vector</b><br><span style="font-size:11px; color:#64748b;">Sistem Manajemen Inventori Gudang</span>`,
       x: 0.05
     },
     xaxis: { title: "Ukuran Elemen Data (N)", gridcolor: "#e2e8f0" },
