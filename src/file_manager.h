@@ -8,7 +8,7 @@
 #include <iostream>
 
 // ============================================================
-//  FileManager - penyimpanan file CSV (wajib per spesifikasi)
+//  FileManager - penyimpanan file CSV 
 //
 //  Format CSV produk:
 //    id,nama,kategori,stok,harga,status

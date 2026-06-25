@@ -26,7 +26,7 @@ const baseLayoutStyles = {
 };
 
 // Membaca file benchmark dari folder public/ atau root public server Vite
-fetch("/benchmark.csv")
+fetch("benchmark.csv")
   .then(response => response.text())
   .then(csvText => {
     const parsed = Papa.parse(csvText, {
